@@ -1,68 +1,102 @@
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-public class XTask implements IXTask{
+public abstract class XTask<Result, ErrorInfo> implements IXTask<Result, ErrorInfo>{
+	private static final String LOG_TAG = XTask.class.getSimpleName();
+	private static final int HIGH_PRIORITY = 0;
+	private static final int MIDLLE_PRIORITY = 10;
+	private static final int LOW_PRIORITY = 20;
+	private int mPriority = MIDLLE_PRIORITY;
+	private Status mStatus = Status.PENDING;
 	private final AtomicBoolean mCancelled = new AtomicBoolean();
-	private final AtomicBoolean mTaskInvoked = new AtomicBoolean();
-	@Override
-	public int compareTo(Object o) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
-	public void run() {
-		// TODO Auto-generated method stub
+	
+	public XTask(){
 		
 	}
+	
+	/**
+	 * Compare two task by priority, in order to enqueue the list by seqence.
+	 */
+	@Override
+	public int compareTo(IXTask<?, ?> o) {
+		if(null == o) throw new NullPointerException("");
+		int p1 = this.getPriority();
+		int p2 = o.getPriority();
+		if(p1 <= p2){
+			return -1;
+		}
+		return 1;
+	}
+
 
 	@Override
-	public Object runInBackground() throws InterruptedException,
-			CanceledExcpetion {
-		// TODO Auto-generated method stub
-		return null;
+	public IXTask.Status getStatus() {
+		return mStatus;
 	}
 
 	@Override
-	public void isCanceled() {
-		// TODO Auto-generated method stub
-		
+	public void setStatus(IXTask.Status status) {
+		mStatus = status;
 	}
+
+
+	@Override
+	public boolean isCanceled() {
+		return mCancelled.get();
+	}
+
+
+	@Override
+	public int getPriority() {
+		return mPriority;
+	}
+
+
+	@Override
+	public void setPriority(int p) {
+		mPriority = p;
+	}
+
 
 	@Override
 	public void cancel() {
-		// TODO Auto-generated method stub
-		
+		mCancelled.set(true);
 	}
+
+
+	@Override
+	public void checkIfCanceled() throws InterruptedException,
+			CancellationException {
+		if(mCancelled.get()){
+			throw new CancellationException("Task has been canceled.");
+		}
+	}
+
+
+	@Override
+	public boolean isFinished() {
+		return mStatus == Status.FINISHED;
+	}
+
 
 	@Override
 	public void onProgressUpdate(Object... data) {
-		// TODO Auto-generated method stub
 		
 	}
 
 	@Override
-	public void onPreExecute() {
-		// TODO Auto-generated method stub
+	public void onException(ErrorInfo errorInfo) {
+		
+	}
+	
+	@Override
+	public void onCanceled(ErrorInfo errorInfo) {
 		
 	}
 
 	@Override
-	public void onException(Exception e) {
-		// TODO Auto-generated method stub
+	public void onResult(Result result) {
 		
 	}
-
-	@Override
-	public void onCanceled(String info) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onPostResult(Object result) {
-		// TODO Auto-generated method stub
-		
-	}
-
 }
