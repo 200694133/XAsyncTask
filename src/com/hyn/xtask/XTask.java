@@ -1,3 +1,4 @@
+package com.hyn.xtask;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -19,7 +20,7 @@ public abstract class XTask<Result, ErrorInfo> implements IXTask<Result, ErrorIn
 	 * Compare two task by priority, in order to enqueue the list by seqence.
 	 */
 	@Override
-	public int compareTo(IXTask<?, ?> o) {
+	public int compareTo(IXTask<Result, ErrorInfo> o) {
 		if(null == o) throw new NullPointerException("");
 		int p1 = this.getPriority();
 		int p2 = o.getPriority();

@@ -1,3 +1,4 @@
+package com.hyn.xtask;
 import java.util.concurrent.CancellationException;
 
 
@@ -6,7 +7,7 @@ import java.util.concurrent.CancellationException;
  * @author Yananh
  *
  */
-public interface IXTask<Result, ErrorInfo> extends Comparable<IXTask<?,?>>{
+public interface IXTask<Result, ErrorInfo> extends Comparable<IXTask<Result, ErrorInfo>>{
     /**
      * Indicates the current status of the task. Each status will be set only once
      * during the lifetime of a task.
@@ -84,4 +85,5 @@ public interface IXTask<Result, ErrorInfo> extends Comparable<IXTask<?,?>>{
 	 * @param result the result after calculate.
 	 */
 	public void onResult(Result result);
+
 }

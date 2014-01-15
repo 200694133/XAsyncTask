@@ -1,3 +1,4 @@
+package com.hyn.xtask;
 public class XLog {
 	public static void d(String tag, String desc) {
 

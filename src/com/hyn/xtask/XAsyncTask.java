@@ -1,3 +1,4 @@
+package com.hyn.xtask;
 import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
