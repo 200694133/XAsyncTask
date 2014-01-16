@@ -8,9 +8,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public abstract class XTask<Result> implements IXFutureTask<Result>, 
 							IXTask <Result>{
 	private static final String LOG_TAG = XTask.class.getSimpleName();
-	
+	/**
+	 * 
+	 */
 	private static final int HIGH_PRIORITY = 0;
+	/**
+	 * 
+	 */
 	private static final int MIDLLE_PRIORITY = 10;
+	/**
+	 * 
+	 */
 	private static final int LOW_PRIORITY = 20;	
 	
 	private int mPriority = MIDLLE_PRIORITY;

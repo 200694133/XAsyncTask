@@ -26,7 +26,7 @@ public class Main {
 			taskm.cancel(tl.get(index));
 			++count;
 			try {
-				Thread.sleep(300);
+				Thread.sleep(100);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}

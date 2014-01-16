@@ -66,6 +66,10 @@ public class XAsyncTask {
 	
 	private FutureTask<Void> parseSubmitTask(final IXFutureTask<?> task){
 		FutureTask<Void> futureTask = new FutureTask<Void>(task, null){
+			 	public boolean cancel(boolean mayInterruptIfRunning) {
+			 		task.cancel();
+			        return super.cancel(mayInterruptIfRunning);
+			    }
 			@Override
 			protected void done() {
 				try {
@@ -75,6 +79,10 @@ public class XAsyncTask {
 				} catch(Throwable e){
 					notifyExcption(task, new XException(0, e.getMessage()));
 				}finally{
+					mWorkQueueLock.lock();
+					mTaskFutureMap.remove(task);
+					//mWorkQueue.remove(task);
+					mWorkQueueLock.unlock();
 					sheduleNext();
 				}
 			}
@@ -97,6 +105,7 @@ public class XAsyncTask {
 			return;
 		}
 		FutureTask<?> futuretask = mTaskFutureMap.get(task);
+		mWorkQueueLock.unlock();
 		if (null == futuretask) return;
 		IXFutureTask.Status status = task.getStatus();
 		if (status == IXFutureTask.Status.FINISHED) {
