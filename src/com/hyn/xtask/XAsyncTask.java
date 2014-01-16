@@ -1,9 +1,7 @@
 package com.hyn.xtask;
 import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -15,7 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 
-public class XAsyncTask<Result, ErrorInfo> {
+public class XAsyncTask {
 	private static final String LOG_TAG = XAsyncTask.class.getSimpleName();
 	private static final AtomicInteger sPoolSize = new AtomicInteger(0);
     private static final int CORE_POOL_SIZE = 5;
@@ -36,11 +34,11 @@ public class XAsyncTask<Result, ErrorInfo> {
     /**
      * work Queue.
      */
-	private final BlockingQueue<IXTask<Result, ErrorInfo>> mPoolWaitingQueue = new PriorityBlockingQueue<IXTask<Result, ErrorInfo>>();
+	private final BlockingQueue<IXFutureTask<?>> mPoolWaitingQueue = new PriorityBlockingQueue<IXFutureTask<?>>();
 	private final BlockingQueue<Runnable> mWorkQueue = new LinkedBlockingQueue<Runnable>(QUEUE_THRESHOLD<<2);
 	ReentrantLock mWorkQueueLock = new ReentrantLock();
-	private final WeakHashMap<IXTask<Result, ErrorInfo>, WorkFutureTask<Result, ErrorInfo>> mTaskFutureMap = 
-			new WeakHashMap<IXTask<Result, ErrorInfo>, WorkFutureTask<Result, ErrorInfo>>();
+	private final WeakHashMap<IXFutureTask<?>, FutureTask<?>> mTaskFutureMap =
+			new WeakHashMap<IXFutureTask<?>, FutureTask<?>>();
 	/**
 	 * Thread pool.
 	 */
@@ -56,9 +54,9 @@ public class XAsyncTask<Result, ErrorInfo> {
 	private void sheduleNext(){
 		mWorkQueueLock.lock();
 		if(mWorkQueue.size() <= QUEUE_THRESHOLD){
-			IXTask<Result, ErrorInfo> task = mPoolWaitingQueue.poll();
+			IXFutureTask<?> task = mPoolWaitingQueue.poll();
 			if(null != task){
-				WorkFutureTask<Result, ErrorInfo> futuretask = parseSubmitTask(task);
+				FutureTask<?> futuretask = parseSubmitTask(task);
 				mTaskFutureMap.put(task, futuretask);
 				mWorkExecutor.execute(futuretask);
 			}
@@ -66,27 +64,17 @@ public class XAsyncTask<Result, ErrorInfo> {
 		mWorkQueueLock.unlock();
 	}
 	
-	private WorkFutureTask<Result, ErrorInfo> parseSubmitTask(IXTask<Result, ErrorInfo> task){
-		WorkFutureTask<Result, ErrorInfo> futureTask = new WorkFutureTask<Result, ErrorInfo>(task){
+	private FutureTask<Void> parseSubmitTask(final IXFutureTask<?> task){
+		FutureTask<Void> futureTask = new FutureTask<Void>(task, null){
 			@Override
 			protected void done() {
 				try {
-					Result result = get();
-					if(mTask.isCanceled()){
-						notifyCancelComplete(mTask);
-					}else{
-						notifyResult(mTask, result);
-					}
+					get();
 				} catch (CancellationException e) {
-					notifyCancelComplete(mTask);
+					notifyCancelComplete(task);
 				} catch(Throwable e){
-					if(mTask.isCanceled()){
-						notifyCancelComplete(mTask);
-					}else{
-						notifyExcption(mTask, null);
-					}
+					notifyExcption(task, new XException(0, e.getMessage()));
 				}finally{
-					mTask.setStatus(IXTask.Status.FINISHED);
 					sheduleNext();
 				}
 			}
@@ -95,12 +83,12 @@ public class XAsyncTask<Result, ErrorInfo> {
 	}
 	
 	
-	public void post(IXTask<Result, ErrorInfo> task){
+	public void post(IXFutureTask<?> task){
 		mPoolWaitingQueue.offer(task);
 		sheduleNext();
 	}
 	
-	public void cancel(IXTask<Result, ErrorInfo> task){
+	public void cancel(IXFutureTask<?> task){
 		mWorkQueueLock.lock();
 		if(mPoolWaitingQueue.contains(task)){
 			mPoolWaitingQueue.remove(task);
@@ -108,12 +96,12 @@ public class XAsyncTask<Result, ErrorInfo> {
 			mWorkQueueLock.unlock();
 			return;
 		}
-		WorkFutureTask<Result, ErrorInfo> futuretask = mTaskFutureMap.get(task);
+		FutureTask<?> futuretask = mTaskFutureMap.get(task);
 		if (null == futuretask) return;
-		IXTask.Status status = task.getStatus();
-		if (status == IXTask.Status.FINISHED) {
+		IXFutureTask.Status status = task.getStatus();
+		if (status == IXFutureTask.Status.FINISHED) {
 			XLog.d(LOG_TAG, "the task  is finished.");
-		} else if (status == IXTask.Status.PENDING) {
+		} else if (status == IXFutureTask.Status.PENDING) {
 			XLog.d(LOG_TAG, "the task  is not running.");
 			futuretask.cancel(true);
 		} else {
@@ -122,45 +110,21 @@ public class XAsyncTask<Result, ErrorInfo> {
 		}
 	}
 	
+	public static void execute(){
+		
+	}
+	
+	
 	public void clearAllTask(){
 		
 	}
 	
-	private void notifyExcption(IXTask<Result, ErrorInfo> task, ErrorInfo info){
+	private void notifyExcption(IXFutureTask<?> task, XException info){
 		task.onException(info);
 	}
 	
-	private void notifyResult(IXTask<Result, ErrorInfo> task, Result result){
-		task.onResult(result);
+	public void notifyCancelComplete(IXFutureTask<?> task){
+		task.onCancelComplete();
 	}
 	
-	public void notifyCancelComplete(IXTask<Result, ErrorInfo> task){
-		task.onCanceled(null);
-	}
-	
-	private static abstract class WorkFutureTask<Result, ErrorInfo> extends FutureTask<Result>{
-		protected IXTask<Result, ErrorInfo> mTask = null;
-		public WorkFutureTask(IXTask<Result, ErrorInfo> task) {
-			super(new WorkCallable<Result, ErrorInfo>(task));
-		}
-		IXTask<Result, ErrorInfo> getTask(){
-			return mTask;
-		}
-		
-        protected  abstract void done();
-	};
-	
-	private static class WorkCallable<Result, ErrInfo> implements Callable<Result>{
-		private IXTask<Result, ErrInfo> mTask = null;
-		WorkCallable(IXTask<Result, ErrInfo> task){
-			mTask = task;
-		}
-		@Override
-		public Result call() throws Exception {
-			mTask.setStatus(IXTask.Status.RUNNING);
-			Result r =  mTask.runInBackground();
-			mTask.setStatus(IXTask.Status.FINISHED);
-			return r;
-		}
-	};
 }

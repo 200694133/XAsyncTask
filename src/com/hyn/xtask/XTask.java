@@ -1,43 +1,53 @@
 package com.hyn.xtask;
+
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
-public abstract class XTask<Result, ErrorInfo> implements IXTask<Result, ErrorInfo>{
+
+public abstract class XTask<Result> implements IXFutureTask<Result>, 
+							IXTask <Result>{
 	private static final String LOG_TAG = XTask.class.getSimpleName();
+	
 	private static final int HIGH_PRIORITY = 0;
 	private static final int MIDLLE_PRIORITY = 10;
-	private static final int LOW_PRIORITY = 20;
+	private static final int LOW_PRIORITY = 20;	
+	
 	private int mPriority = MIDLLE_PRIORITY;
 	private Status mStatus = Status.PENDING;
 	private final AtomicBoolean mCancelled = new AtomicBoolean();
+	
 	
 	public XTask(){
 		
 	}
 	
-	/**
-	 * Compare two task by priority, in order to enqueue the list by seqence.
-	 */
-	@Override
-	public int compareTo(IXTask<Result, ErrorInfo> o) {
-		if(null == o) throw new NullPointerException("");
-		int p1 = this.getPriority();
-		int p2 = o.getPriority();
-		if(p1 <= p2){
-			return -1;
+	public void run(){
+		setStatus(Status.RUNNING);
+		try{
+			Result res = runInBackground();
+			setStatus(Status.FINISHED);
+			if(isCanceled()){
+				onCancelComplete() ;
+			}else{
+				onResult(res);
+			}
+		}catch(CancellationException e){
+			onCancelComplete() ;
+		}catch(Throwable t){
+			onException(new XException(0, t.getMessage()));
+		}finally{
+			setStatus(Status.FINISHED);
 		}
-		return 1;
-	}
-
-
+	}	
+	
 	@Override
-	public IXTask.Status getStatus() {
+	public IXFutureTask.Status getStatus() {
 		return mStatus;
 	}
 
 	@Override
-	public void setStatus(IXTask.Status status) {
+	public void setStatus(IXFutureTask.Status status) {
 		mStatus = status;
 	}
 
@@ -87,17 +97,31 @@ public abstract class XTask<Result, ErrorInfo> implements IXTask<Result, ErrorIn
 	}
 
 	@Override
-	public void onException(ErrorInfo errorInfo) {
+	public void onException(XException  exception) {
 		
 	}
 	
 	@Override
-	public void onCanceled(ErrorInfo errorInfo) {
-		
+	public void onCancelComplete() {
+		XLog.d(LOG_TAG, " onCancelComplete");
 	}
 
 	@Override
 	public void onResult(Result result) {
-		
+		XLog.d(LOG_TAG, " onResult"+result);
+	}
+
+	/**
+	 * Compare two task by priority, in order to enqueue the list by seqence.
+	 */
+	@Override
+	public int compareTo(IXFutureTask<Result> o) {
+		if(null == o) throw new NullPointerException("");
+		int p1 = this.getPriority();
+		int p2 = o.getPriority();
+		if(p1 <= p2){
+			return -1;
+		}
+		return 1;
 	}
 }
